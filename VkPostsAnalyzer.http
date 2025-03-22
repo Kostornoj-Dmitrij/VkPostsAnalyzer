@@ -1,0 +1,6 @@
+@VkPostsAnalyzer_HostAddress = http://localhost:5144
+
+GET {{VkPostsAnalyzer_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
