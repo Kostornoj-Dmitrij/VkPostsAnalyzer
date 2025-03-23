@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Serilog;
-using VkPostsAnalyzer;
 using VkPostsAnalyzer.Data;
 using VkPostsAnalyzer.Services;
 
@@ -9,6 +8,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddHttpClient<VkService>();
 
 builder.Services.AddScoped<VkService>();
 
