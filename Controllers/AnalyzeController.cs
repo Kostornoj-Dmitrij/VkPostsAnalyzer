@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json.Linq;
 using VkPostsAnalyzer.Data;
 using VkPostsAnalyzer.Models;
 using VkPostsAnalyzer.Services;
@@ -25,22 +24,17 @@ public class AnalyzeController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> AnalyzePosts([FromQuery] string accessToken, [FromQuery] int userId)
+    public async Task<IActionResult> AnalyzePosts([FromQuery] string vkPageUrl)
     {
         _logger.LogInformation("Starting analysis");
 
-        var postsJson = await _vkService.GetPostsTextAsync(accessToken, userId);
-        var response = JObject.Parse(postsJson)["response"];
-        var posts = response["items"].ToObject<List<JObject>>();
+        var text = await _vkService.GetPostsTextAsync(vkPageUrl);
 
-        if (posts == null || !posts.Any())
+        if (string.IsNullOrEmpty(text))
         {
-            _logger.LogWarning("No posts found for user {UserId}", userId);
-            return NotFound("No posts found.");
+            _logger.LogWarning("No text posts found on the page.");
+            return NotFound("No text posts found.");
         }
-
-        var texts = posts.Select(p => p["text"]?.ToString()).ToList();
-        var text = string.Join(" ", texts.Where(t => !string.IsNullOrEmpty(t)));
 
         var letterCounts = ProcessText(text);
         await SaveResultsAsync(letterCounts);

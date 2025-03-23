@@ -1,6 +1,4 @@
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using VkPostsAnalyzer.Models;
+using PuppeteerSharp;
 
 namespace VkPostsAnalyzer.Services;
 
@@ -13,29 +11,62 @@ public class VkService
         _logger = logger;
     }
 
-    public Task<string> GetPostsTextAsync(string accessToken, int userId, int count = 5)
+    public async Task<string> GetPostsTextAsync(string vkPageUrl)
     {
-        _logger.LogInformation("Fetching mock posts from VK");
+        _logger.LogInformation("Fetching posts from VK page: {Url}", vkPageUrl);
 
-        var mockPosts = new
+        await new BrowserFetcher().DownloadAsync();
+
+        var browser = await Puppeteer.LaunchAsync(new LaunchOptions
         {
-            response = new
+            Headless = true
+        });
+
+        var page = await browser.NewPageAsync();
+
+        await page.GoToAsync(vkPageUrl, WaitUntilNavigation.Networkidle2);
+
+        var postsLimit = 5;
+        await page.EvaluateFunctionAsync(@"
+                (postsLimit) => {
+                    const posts = document.querySelectorAll('.vkitShowMoreText__text');
+                    if (posts.length > postsLimit) {
+                        for (let i = postsLimit; i < posts.length; i++) {
+                            posts[i].remove();
+                        }
+                    }
+                }
+            ", postsLimit);
+
+        var html = await page.GetContentAsync();
+
+        await browser.CloseAsync();
+        
+        var htmlDoc = new HtmlAgilityPack.HtmlDocument();
+        htmlDoc.LoadHtml(html);
+
+        var postTexts = new List<string>();
+        var postNodes = htmlDoc.DocumentNode.SelectNodes("//div[contains(@class, 'vkitShowMoreText__text')]");
+
+        if (postNodes != null)
+        {
+            postsLimit = 5;
+            for (int i = 0; i < Math.Min(postNodes.Count, postsLimit); i++)
             {
-                items = new[]
+                var text = postNodes[i].InnerText.Trim();
+                if (!string.IsNullOrEmpty(text))
                 {
-                    new { text = "HelLo world! This is a test post." },
-                    new { text = "C# is aWeSoMe" },
-                    new { text = "VK API is cool, but we're using mocks for now." },
-                    new { text = "4 post for testing purposes." },
-                    new { text = "This is the fifth post." },
-                    new { text = "6 post." },
-                    new { text = "7 post." },
-                    new { text = "8 post." }
+                    postTexts.Add(text);
                 }
             }
-        };
+        }
 
-        var json = JsonConvert.SerializeObject(mockPosts);
-        return Task.FromResult(json);
+        if (!postTexts.Any())
+        {
+            _logger.LogWarning("No text posts found.");
+            return string.Empty;
+        }
+
+        return string.Join(" ", postTexts);
     }
 }
